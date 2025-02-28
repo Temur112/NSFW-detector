@@ -7,7 +7,7 @@ import mimetypes
 from src.services.nsfw_detector import detect_nsfw_image, detect_nsfw_video
 # import response models
 from src.utils.utils import validate_and_convert_image
-from src.schemas.detection import URLDetectionRequest
+from src.schemas.detection import URLDetectionRequest, DetectionResult
 
 
 ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "bmp"}
@@ -98,3 +98,36 @@ async def detect_nsfw_from_url(request:URLDetectionRequest):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="unsupported file")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"internal server error due to {e}" )
+    
+
+
+@detector_router.post("/detect/local", response_model=DetectionResult)
+async def detect_nsfw_from_local(file_path:str):
+    """
+        Detects NSFW content from local existing file absoulte path need to be provided
+    
+    """
+
+    abs_path = os.path.abspath(file_path)
+
+
+    if not os.path.exists(abs_path):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File Not found")
+    
+    # print(file_extension)
+
+    _, file_extension = os.path.splitext(file_path)
+    
+    file_extension = file_extension.replace(".", "")
+
+
+    if file_extension in ALLOWED_IMAGE_EXTENSIONS:
+        result = detect_nsfw_image(path=file_path)
+        return {"nsfw": result["nsfw"], "confidence": result["confidence"]}
+    elif file_extension in ALLOWED_VIDEO_EXTENSIONS:
+        result = detect_nsfw_video(file_path)
+        return {"nsfw": result["nsfw"], "confidence": result["confidence"]}
+    else:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Unsupported file type")
+    
+
